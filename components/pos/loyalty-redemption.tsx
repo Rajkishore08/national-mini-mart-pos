@@ -47,7 +47,7 @@ export function LoyaltyRedemption({
       setMaxRedeemablePoints(maxPoints)
       
       // Calculate max discount amount (1 point = ₹5)
-      const maxDiscount = (maxPoints / 100) * 5
+      const maxDiscount = maxPoints * 5 // Fixed: 5 rupees per point
       setMaxDiscountAmount(maxDiscount)
     }
   }, [customer])
@@ -76,7 +76,7 @@ export function LoyaltyRedemption({
       return
     }
 
-    const discountAmount = (points / 100) * 5
+    const discountAmount = points * 5 // Fixed: 5 rupees per point
     if (discountAmount > totalAmount) {
       toast.error("Discount amount cannot exceed total amount")
       return
@@ -118,7 +118,7 @@ export function LoyaltyRedemption({
             <div className="text-xs text-muted-foreground space-y-1">
               <div className="flex items-center gap-1">
                 <Info className="h-3 w-3" />
-                <span>100 points = ₹5 discount</span>
+                <span>1 point = ₹5 discount</span>
               </div>
               <div className="flex items-center gap-1">
                 <Coins className="h-3 w-3" />
@@ -165,7 +165,7 @@ export function LoyaltyRedemption({
           <DialogHeader>
             <DialogTitle>Redeem Loyalty Points</DialogTitle>
             <DialogDescription>
-              Redeem your loyalty points for discounts. 100 points = ₹5 discount.
+              Redeem your loyalty points for discounts. 1 point = ₹5 discount.
             </DialogDescription>
           </DialogHeader>
           
@@ -196,7 +196,7 @@ export function LoyaltyRedemption({
               <div className="flex justify-between text-sm">
                 <span>Discount Amount:</span>
                 <span className="text-green-600 font-medium">
-                  ₹{pointsToRedeem ? ((parseInt(pointsToRedeem) / 100) * 5).toFixed(2) : "0.00"}
+                  ₹{pointsToRedeem ? (parseInt(pointsToRedeem) * 5).toFixed(2) : "0.00"}
                 </span>
               </div>
             </div>

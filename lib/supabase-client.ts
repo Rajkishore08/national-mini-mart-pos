@@ -3,18 +3,12 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// Create a singleton client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
+    persistSession: true,
+    detectSessionInUrl: true
+  }
 })
 
 export type Database = {
@@ -24,62 +18,94 @@ export type Database = {
         Row: {
           id: string
           email: string
-          full_name: string
-          role: "admin" | "cashier" | "manager"
+          full_name: string | null
+          role: string
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
           email: string
-          full_name: string
-          role?: "admin" | "cashier" | "manager"
+          full_name?: string | null
+          role?: string
+          created_at?: string
+          updated_at?: string
         }
         Update: {
-          full_name?: string
-          role?: "admin" | "cashier" | "manager"
+          id?: string
+          email?: string
+          full_name?: string | null
+          role?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      categories: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
         }
       }
       products: {
         Row: {
           id: string
           name: string
-          barcode: string | null
           price: number
           stock_quantity: number
           min_stock_level: number
-          category_id: string | null
           gst_rate: number
           price_includes_gst: boolean
+          hsn_code: string
+          brand: string
+          barcode: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
+          id?: string
           name: string
-          barcode?: string
           price: number
-          stock_quantity?: number
+          stock_quantity: number
           min_stock_level?: number
-          category_id?: string
           gst_rate?: number
           price_includes_gst?: boolean
+          hsn_code?: string
+          brand?: string
+          barcode?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
+          id?: string
           name?: string
-          barcode?: string
           price?: number
           stock_quantity?: number
           min_stock_level?: number
-          category_id?: string
           gst_rate?: number
           price_includes_gst?: boolean
+          hsn_code?: string
+          brand?: string
+          barcode?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
       transactions: {
         Row: {
           id: string
           invoice_number: string
-          cashier_id: string | null
+          cashier_id: string
           customer_id: string | null
           customer_name: string | null
           customer_phone: string | null
@@ -90,18 +116,19 @@ export type Database = {
           loyalty_points_earned: number
           loyalty_points_redeemed: number
           loyalty_discount_amount: number
-          payment_method: "cash" | "card" | "upi"
+          payment_method: string
           cash_received: number | null
           change_amount: number | null
-          status: "completed" | "cancelled" | "pending"
+          status: string
           created_at: string
         }
         Insert: {
+          id?: string
           invoice_number: string
-          cashier_id?: string
-          customer_id?: string
-          customer_name?: string
-          customer_phone?: string
+          cashier_id: string
+          customer_id?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           subtotal: number
           gst_amount: number
           total_amount: number
@@ -109,17 +136,19 @@ export type Database = {
           loyalty_points_earned?: number
           loyalty_points_redeemed?: number
           loyalty_discount_amount?: number
-          payment_method: "cash" | "card" | "upi"
-          cash_received?: number
-          change_amount?: number
-          status?: "completed" | "cancelled" | "pending"
+          payment_method: string
+          cash_received?: number | null
+          change_amount?: number | null
+          status?: string
+          created_at?: string
         }
         Update: {
+          id?: string
           invoice_number?: string
           cashier_id?: string
-          customer_id?: string
-          customer_name?: string
-          customer_phone?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           subtotal?: number
           gst_amount?: number
           total_amount?: number
@@ -127,10 +156,124 @@ export type Database = {
           loyalty_points_earned?: number
           loyalty_points_redeemed?: number
           loyalty_discount_amount?: number
-          payment_method?: "cash" | "card" | "upi"
-          cash_received?: number
-          change_amount?: number
-          status?: "completed" | "cancelled" | "pending"
+          payment_method?: string
+          cash_received?: number | null
+          change_amount?: number | null
+          status?: string
+          created_at?: string
+        }
+      }
+      transaction_items: {
+        Row: {
+          id: string
+          transaction_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          gst_rate: number
+          price_includes_gst: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transaction_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          gst_rate?: number
+          price_includes_gst?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transaction_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          unit_price?: number
+          total_price?: number
+          gst_rate?: number
+          price_includes_gst?: boolean
+          created_at?: string
+        }
+      }
+      settings: {
+        Row: {
+          id: string
+          key: string
+          value: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          value: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          value?: string
+          created_at?: string
+        }
+      }
+      stock_movements: {
+        Row: {
+          id: string
+          product_id: string
+          movement_type: string
+          quantity: number
+          reason: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          movement_type: string
+          quantity: number
+          reason: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          movement_type?: string
+          quantity?: number
+          reason?: string
+          created_at?: string
+        }
+      }
+      customers: {
+        Row: {
+          id: string
+          name: string
+          phone: string
+          email: string | null
+          loyalty_points: number
+          total_spent: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone: string
+          email?: string | null
+          loyalty_points?: number
+          total_spent?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string
+          email?: string | null
+          loyalty_points?: number
+          total_spent?: number
+          created_at?: string
         }
       }
       loyalty_transactions: {
@@ -145,87 +288,35 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          id?: string
           customer_id: string
           transaction_id: string
           points_earned?: number
           points_redeemed?: number
           discount_amount?: number
           transaction_type: string
+          created_at?: string
         }
         Update: {
+          id?: string
           customer_id?: string
           transaction_id?: string
           points_earned?: number
           points_redeemed?: number
           discount_amount?: number
           transaction_type?: string
+          created_at?: string
         }
       }
-      transaction_items: {
-        Row: {
-          id: string
-          transaction_id: string
-          product_id: string
-          product_name: string
-          quantity: number
-          unit_price: number
-          total_price: number
-          gst_rate: number
-          price_includes_gst: boolean
-        }
-        Insert: {
-          transaction_id: string
-          product_id: string
-          product_name: string
-          quantity: number
-          unit_price: number
-          total_price: number
-          gst_rate: number
-          price_includes_gst?: boolean
-        }
-        Update: {
-          transaction_id?: string
-          product_id?: string
-          product_name?: string
-          quantity?: number
-          unit_price?: number
-          total_price?: number
-          gst_rate?: number
-          price_includes_gst?: boolean
-        }
-      }
-      customers: {
-        Row: {
-          id: string
-          name: string
-          phone: string
-          email: string | null
-          address: string | null
-          date_of_birth: string | null
-          loyalty_points: number
-          total_spent: number
-          visit_count: number
-          last_visit: string | null
-          created_at: string
-          updated_at: string
-        }
-      }
-      categories: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          created_at: string
-        }
-      }
-      settings: {
-        Row: {
-          id: string
-          key: string
-          value: string
-          updated_at: string
-        }
-      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }
