@@ -157,7 +157,7 @@ export default function CustomersPage() {
 
   const handleDelete = async (customerId: string) => {
     try {
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from("customers")
         .delete()
         .eq("id", customerId);
@@ -168,14 +168,9 @@ export default function CustomersPage() {
         return;
       }
 
-      // Optionally: check if data is empty (no row deleted)
-      if (!data || (Array.isArray(data) && data.length === 0)) {
-        toast.error("No customer was deleted. The customer may not exist or is referenced elsewhere.");
-        return;
-      }
-
       toast.success("Customer deleted successfully!");
-      // Refresh your customer list here (if needed)
+      // Refresh the customer list
+      fetchCustomers();
     } catch (err) {
       console.error("Unexpected error deleting customer:", err);
       toast.error("Unexpected error: " + (err instanceof Error ? err.message : JSON.stringify(err)));
