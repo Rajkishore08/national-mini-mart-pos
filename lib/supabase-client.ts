@@ -87,6 +87,9 @@ export type Database = {
           gst_amount: number
           total_amount: number
           rounding_adjustment: number
+          loyalty_points_earned: number
+          loyalty_points_redeemed: number
+          loyalty_discount_amount: number
           payment_method: "cash" | "card" | "upi"
           cash_received: number | null
           change_amount: number | null
@@ -103,6 +106,9 @@ export type Database = {
           gst_amount: number
           total_amount: number
           rounding_adjustment?: number
+          loyalty_points_earned?: number
+          loyalty_points_redeemed?: number
+          loyalty_discount_amount?: number
           payment_method: "cash" | "card" | "upi"
           cash_received?: number
           change_amount?: number
@@ -118,10 +124,41 @@ export type Database = {
           gst_amount?: number
           total_amount?: number
           rounding_adjustment?: number
+          loyalty_points_earned?: number
+          loyalty_points_redeemed?: number
+          loyalty_discount_amount?: number
           payment_method?: "cash" | "card" | "upi"
           cash_received?: number
           change_amount?: number
           status?: "completed" | "cancelled" | "pending"
+        }
+      }
+      loyalty_transactions: {
+        Row: {
+          id: string
+          customer_id: string
+          transaction_id: string
+          points_earned: number
+          points_redeemed: number
+          discount_amount: number
+          transaction_type: string
+          created_at: string
+        }
+        Insert: {
+          customer_id: string
+          transaction_id: string
+          points_earned?: number
+          points_redeemed?: number
+          discount_amount?: number
+          transaction_type: string
+        }
+        Update: {
+          customer_id?: string
+          transaction_id?: string
+          points_earned?: number
+          points_redeemed?: number
+          discount_amount?: number
+          transaction_type?: string
         }
       }
       transaction_items: {

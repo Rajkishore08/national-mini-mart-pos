@@ -169,6 +169,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <span>SGST (${((transaction.gst_amount / transaction.subtotal) * 50).toFixed(1)}%):</span>
           <span>₹${(transaction.gst_amount / 2).toFixed(2)}</span>
         </div>
+        ${transaction.loyalty_discount_amount > 0 ? `
+        <div class="row">
+          <span>Loyalty Discount:</span>
+          <span>-₹${transaction.loyalty_discount_amount.toFixed(2)}</span>
+        </div>
+        ` : ''}
         ${transaction.rounding_adjustment !== 0 ? `
         <div class="row">
           <span>Rounding:</span>
@@ -204,12 +210,13 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
         }
         
         ${
-          transaction.customer && transaction.loyalty_points_earned > 0
+          transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
             ? `
         <div class="line"></div>
         <div class="loyalty-box">
           <div class="bold">LOYALTY POINTS</div>
-          <div>Points Earned: +${transaction.loyalty_points_earned}</div>
+          ${transaction.loyalty_points_earned > 0 ? `<div>Points Earned: +${transaction.loyalty_points_earned}</div>` : ''}
+          ${transaction.loyalty_points_redeemed > 0 ? `<div>Points Redeemed: -${transaction.loyalty_points_redeemed}</div>` : ''}
           <div>Thank you for your loyalty!</div>
         </div>
         `
@@ -400,6 +407,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
             <td>SGST:</td>
             <td class="text-right">₹${(transaction.gst_amount / 2).toFixed(2)}</td>
           </tr>
+          ${transaction.loyalty_discount_amount > 0 ? `
+          <tr>
+            <td>Loyalty Discount:</td>
+            <td class="text-right">-₹${transaction.loyalty_discount_amount.toFixed(2)}</td>
+          </tr>
+          ` : ''}
           ${transaction.rounding_adjustment !== 0 ? `
           <tr>
             <td>Rounding:</td>
@@ -413,11 +426,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
         </table>
         
         ${
-          transaction.customer && transaction.loyalty_points_earned > 0
+          transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
             ? `
         <div class="loyalty-section">
           <h3 style="margin: 0 0 10px 0; color: #6366f1;">🎁 LOYALTY REWARDS</h3>
-          <p style="margin: 5px 0; font-size: 16px;"><strong>Points Earned: +${transaction.loyalty_points_earned}</strong></p>
+          ${transaction.loyalty_points_earned > 0 ? `<p style="margin: 5px 0; font-size: 16px;"><strong>Points Earned: +${transaction.loyalty_points_earned}</strong></p>` : ''}
+          ${transaction.loyalty_points_redeemed > 0 ? `<p style="margin: 5px 0; font-size: 16px;"><strong>Points Redeemed: -${transaction.loyalty_points_redeemed}</strong></p>` : ''}
           <p style="margin: 5px 0;">Thank you for being a valued customer!</p>
         </div>
         `
@@ -513,6 +527,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
               <span>SGST (9%):</span>
               <span>₹{(transaction.gst_amount / 2).toFixed(2)}</span>
             </div>
+            {transaction.loyalty_discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Loyalty Discount:</span>
+                <span>-₹{transaction.loyalty_discount_amount.toFixed(2)}</span>
+              </div>
+            )}
             {transaction.rounding_adjustment !== 0 && (
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Rounding:</span>
@@ -545,7 +565,7 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
             )}
           </div>
 
-          {transaction.customer && transaction.loyalty_points_earned > 0 && (
+          {transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0) && (
             <>
               <div className="border-t border-dashed border-gray-400 my-2"></div>
               <motion.div
