@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +13,7 @@ import { ReceiptPreview } from "./receipt-preview"
 import { LoyaltyRedemption } from "./loyalty-redemption"
 import { Search, Plus, Minus, Trash2, CreditCard, Smartphone, Banknote, Receipt } from "lucide-react"
 import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type Product = {
   id: string
@@ -21,6 +22,8 @@ type Product = {
   stock_quantity: number
   gst_rate: number
   price_includes_gst: boolean
+  hsn_code: string
+  brand: string
   barcode?: string
 }
 
@@ -46,6 +49,8 @@ export function POSInterface() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedBrand, setSelectedBrand] = useState<string>("all")
+  const [brands, setBrands] = useState<string[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash")
   const [cashReceived, setCashReceived] = useState("")
   const [loading, setLoading] = useState(false)
@@ -59,105 +64,32 @@ export function POSInterface() {
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState(0)
   const [loyaltyDiscountAmount, setLoyaltyDiscountAmount] = useState(0)
 
-  useEffect(() => {
-    fetchProducts()
-    fetchLastBillNumber()
-  }, [])
-
-  const fetchProducts = async () => {
-    try {
-      setProductsLoading(true)
-      const { data, error } = await supabase.from("products").select("*").gt("stock_quantity", 0).order("name")
-
-      if (error) {
-        console.error("Error fetching products:", error)
-        return
-      }
-
-      setProducts(data || [])
-    } catch (error) {
-      console.error("Error:", error)
-    } finally {
-      setProductsLoading(false)
+  // Memoized filtered products for better performance
+  const filteredProducts = useMemo(() => {
+    let filtered = products
+    
+    // Filter by brand
+    if (selectedBrand !== "all") {
+      filtered = filtered.filter(product => product.brand === selectedBrand)
     }
-  }
-
-  const fetchLastBillNumber = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("invoice_number")
-        .like("invoice_number", "NM %")
-        .order("invoice_number", { ascending: false })
-        .limit(1)
-
-      if (error) {
-        console.error("Error fetching last bill number:", error)
-        return
-      }
-
-      if (data && data.length > 0) {
-        lastBillNumberRef.current = data[0].invoice_number
-      }
-    } catch (error) {
-      console.error("Error:", error)
+    
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase()
+      filtered = filtered.filter(
+        (product) => 
+          product.name.toLowerCase().includes(searchLower) || 
+          product.barcode?.includes(searchLower) ||
+          product.brand.toLowerCase().includes(searchLower) ||
+          product.hsn_code.includes(searchLower)
+      )
     }
-  }
+    
+    return filtered
+  }, [products, searchTerm, selectedBrand])
 
-  const getNextBillNumber = () => {
-    const currentNumber = parseInt(lastBillNumberRef.current.replace("NM ", ""))
-    const nextNumber = currentNumber + 1
-    const formattedNumber = `NM ${nextNumber.toString().padStart(4, "0")}`
-    lastBillNumberRef.current = formattedNumber
-    return formattedNumber
-  }
-
-  const filteredProducts = products.filter(
-    (product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.barcode?.includes(searchTerm),
-  )
-
-  const addToCart = (product: Product) => {
-    const existingItem = cart.find((item) => item.product.id === product.id)
-
-    if (existingItem) {
-      if (existingItem.quantity < product.stock_quantity) {
-        updateQuantity(product.id, existingItem.quantity + 1)
-      }
-    } else {
-      const newItem: CartItem = {
-        product,
-        quantity: 1,
-        total: product.price,
-      }
-      setCart([...cart, newItem])
-    }
-  }
-
-  const updateQuantity = (productId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      removeFromCart(productId)
-      return
-    }
-
-    setCart(
-      cart.map((item) => {
-        if (item.product.id === productId) {
-          return {
-            ...item,
-            quantity: newQuantity,
-            total: item.product.price * newQuantity,
-          }
-        }
-        return item
-      }),
-    )
-  }
-
-  const removeFromCart = (productId: string) => {
-    setCart(cart.filter((item) => item.product.id !== productId))
-  }
-
-  const calculateTotals = () => {
+  // Memoized totals calculation
+  const totals = useMemo(() => {
     // Calculate base amounts and GST breakdown
     let baseSubtotal = 0
     let gstAmount = 0
@@ -198,18 +130,109 @@ export function POSInterface() {
       roundedTotal, 
       roundingAdjustment 
     }
-  }
+  }, [cart, loyaltyDiscountAmount])
 
-  const { subtotal, gstAmount, total, totalAfterLoyalty, roundedTotal, roundingAdjustment } = calculateTotals()
+  const { subtotal, gstAmount, total, totalAfterLoyalty, roundedTotal, roundingAdjustment } = totals
   const changeAmount = paymentMethod === "cash" ? Math.max(0, Number.parseFloat(cashReceived || "0") - roundedTotal) : 0
   const loyaltyPointsEarned = Math.floor(roundedTotal / 100)
 
-  const handleLoyaltyApplied = (pointsRedeemed: number, discountAmount: number) => {
+  const fetchProducts = useCallback(async () => {
+    try {
+      setProductsLoading(true)
+      const { data, error } = await supabase.rpc('get_products_with_stock')
+
+      if (error) {
+        console.error("Error fetching products:", error)
+        return
+      }
+
+      setProducts(data || [])
+      
+      // Extract unique brands
+      const uniqueBrands = [...new Set((data || []).map((p: Product) => p.brand))].sort() as string[]
+      setBrands(uniqueBrands)
+    } catch (error) {
+      console.error("Error:", error)
+    } finally {
+      setProductsLoading(false)
+    }
+  }, [])
+
+  const fetchLastBillNumber = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_last_bill_number')
+
+      if (error) {
+        console.error("Error fetching last bill number:", error)
+        return
+      }
+
+      if (data) {
+        lastBillNumberRef.current = data
+      }
+    } catch (error) {
+      console.error("Error:", error)
+    }
+  }, [])
+
+  const getNextBillNumber = useCallback(() => {
+    const currentNumber = parseInt(lastBillNumberRef.current.replace("NM ", ""))
+    const nextNumber = currentNumber + 1
+    const formattedNumber = `NM ${nextNumber.toString().padStart(4, "0")}`
+    lastBillNumberRef.current = formattedNumber
+    return formattedNumber
+  }, [])
+
+  useEffect(() => {
+    fetchProducts()
+    fetchLastBillNumber()
+  }, [fetchProducts, fetchLastBillNumber])
+
+  const addToCart = useCallback((product: Product) => {
+    const existingItem = cart.find((item) => item.product.id === product.id)
+
+    if (existingItem) {
+      if (existingItem.quantity < product.stock_quantity) {
+        updateQuantity(product.id, existingItem.quantity + 1)
+      }
+    } else {
+      const newItem: CartItem = {
+        product,
+        quantity: 1,
+        total: product.price,
+      }
+      setCart(prev => [...prev, newItem])
+    }
+  }, [cart])
+
+  const updateQuantity = useCallback((productId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId)
+      return
+    }
+
+    setCart(prev => prev.map((item) => {
+      if (item.product.id === productId) {
+        return {
+          ...item,
+          quantity: newQuantity,
+          total: item.product.price * newQuantity,
+        }
+      }
+      return item
+    }))
+  }, [])
+
+  const removeFromCart = useCallback((productId: string) => {
+    setCart(prev => prev.filter((item) => item.product.id !== productId))
+  }, [])
+
+  const handleLoyaltyApplied = useCallback((pointsRedeemed: number, discountAmount: number) => {
     setLoyaltyPointsRedeemed(pointsRedeemed)
     setLoyaltyDiscountAmount(discountAmount)
-  }
+  }, [])
 
-  const processPayment = async () => {
+  const processPayment = useCallback(async () => {
     if (cart.length === 0) return
 
     if (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < roundedTotal) {
@@ -337,22 +360,38 @@ export function POSInterface() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [
+    cart, 
+    paymentMethod, 
+    cashReceived, 
+    roundedTotal, 
+    profile, 
+    selectedCustomer, 
+    subtotal, 
+    gstAmount, 
+    roundingAdjustment, 
+    loyaltyPointsEarned, 
+    loyaltyPointsRedeemed, 
+    loyaltyDiscountAmount, 
+    changeAmount, 
+    getNextBillNumber, 
+    fetchProducts
+  ])
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([])
     setCashReceived("")
     setLoyaltyPointsRedeemed(0)
     setLoyaltyDiscountAmount(0)
-  }
+  }, [])
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = useCallback((amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
     }).format(amount)
-  }
+  }, [])
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full p-6">
@@ -361,14 +400,45 @@ export function POSInterface() {
         <Card>
           <CardHeader>
             <CardTitle>Products</CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search products or scan barcode..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            {/* Search and Filter */}
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search products, brands, HSN codes..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Brands" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Brands</SelectItem>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand} value={brand}>
+                        {brand}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>{filteredProducts.length} products found</span>
+                {selectedBrand !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedBrand("all")}
+                  >
+                    Clear Brand Filter
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -386,27 +456,38 @@ export function POSInterface() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {filteredProducts.map((product) => (
                   <Card
                     key={product.id}
-                    className="cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500"
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => addToCart(product)}
                   >
                     <CardContent className="p-3">
-                      <h3 className="font-medium text-sm mb-1 line-clamp-2">{product.name}</h3>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-lg font-bold text-green-600">{formatCurrency(product.price)}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          Stock: {product.stock_quantity}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {product.price_includes_gst ? (
-                          <span className="text-green-600">✓ Price includes {product.gst_rate}% GST</span>
-                        ) : (
-                          <span className="text-orange-600">+ {product.gst_rate}% GST will be added</span>
-                        )}
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <h3 className="font-medium text-sm line-clamp-2">{product.name}</h3>
+                          <p className="text-xs text-muted-foreground">{product.brand}</p>
+                        </div>
+                        
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-lg font-bold text-green-600">{formatCurrency(product.price)}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            Stock: {product.stock_quantity}
+                          </Badge>
+                        </div>
+                        
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div className="flex justify-between">
+                            <span>HSN:</span>
+                            <span className="font-mono">{product.hsn_code}</span>
+                          </div>
+                          {product.price_includes_gst ? (
+                            <span className="text-green-600">✓ Price includes {product.gst_rate}% GST</span>
+                          ) : (
+                            <span className="text-orange-600">+ {product.gst_rate}% GST will be added</span>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -443,7 +524,6 @@ export function POSInterface() {
                 <p className="text-center text-gray-500 py-4">Cart is empty</p>
               ) : (
                 cart.map((item) => {
-                  // Calculate proper item total based on GST inclusion
                   let itemTotal = 0
                   let priceDisplay = ""
                   
@@ -463,24 +543,16 @@ export function POSInterface() {
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.product.name}</p>
-                        <p className="text-xs text-gray-500">{priceDisplay}</p>
+                        <p className="text-xs text-gray-500">{item.product.brand} • HSN: {item.product.hsn_code}</p>
+                        <p className="text-xs text-gray-400">{priceDisplay}</p>
                         <p className="text-xs text-gray-400">Qty: {item.quantity} × {formatCurrency(item.product.price)}</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>
                           <Minus className="h-3 w-3" />
                         </Button>
                         <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                          disabled={item.quantity >= item.product.stock_quantity}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => updateQuantity(item.product.id, item.quantity + 1)} disabled={item.quantity >= item.product.stock_quantity}>
                           <Plus className="h-3 w-3" />
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => removeFromCart(item.product.id)}>

@@ -56,104 +56,55 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
   }
 
   const generateThermalReceiptHTML = () => {
-    const formatDate = (dateString: string) => {
-      const date = new Date(dateString)
-      return (
-        date.toLocaleDateString("en-IN") +
-        " " +
-        date.toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      )
-    }
-
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Receipt - ${transaction.invoice_number}</title>
+        <meta charset="utf-8">
+        <title>Receipt</title>
         <style>
-          @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
-          }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.3;
-            max-width: 80mm;
-            margin: 0 auto;
-            padding: 5mm;
-            color: #000;
-          }
-          .center { text-align: center; }
+          body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; }
+          .header { text-align: center; margin-bottom: 10px; }
+          .title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+          .subtitle { font-size: 12px; color: #666; }
+          .row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .item { margin: 5px 0; }
+          .item-name { font-weight: bold; }
+          .item-details { font-size: 10px; color: #666; }
+          .line { border-top: 1px dashed #ccc; margin: 5px 0; }
+          .total { font-weight: bold; font-size: 14px; }
+          .loyalty-box { border: 1px solid #000; padding: 5px; margin: 10px 0; text-align: center; }
           .bold { font-weight: bold; }
-          .line { border-top: 1px dashed #000; margin: 3px 0; }
-          .double-line { border-top: 2px solid #000; margin: 3px 0; }
-          .row { display: flex; justify-content: space-between; margin: 1px 0; }
-          .item-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin: 1px 0;
-            font-size: 10px;
-          }
-          .item-name { 
-            flex: 1; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            white-space: nowrap;
-            margin-right: 5px;
-          }
-          .loyalty-box {
-            border: 1px solid #000;
-            padding: 3px;
-            margin: 3px 0;
-            text-align: center;
-          }
+          .footer { text-align: center; margin-top: 10px; font-size: 10px; }
         </style>
       </head>
       <body>
-        <div class="center bold">
-          ${storeSettings.store_name || "NATIONAL MINI MART"}<br>
-          ${storeSettings.store_address || ""}<br>
-          ${storeSettings.store_phone || ""}<br>
-          GST: ${storeSettings.gst_number || ""}<br>
-        </div>
-        
-        <div class="double-line"></div>
-        
-        <div>
-          Date: ${formatDate(transaction.created_at)}<br>
-          Bill No: ${transaction.invoice_number}<br>
-          Cashier: ${transaction.cashier?.full_name || "Staff"}<br>
-          ${transaction.customer ? `Customer: ${transaction.customer.name}<br>` : ""}
-          ${transaction.customer ? `Phone: ${transaction.customer.phone}<br>` : ""}
+        <div class="header">
+          <div class="title">NATIONAL MINI MART</div>
+          <div class="subtitle">Your Trusted Store</div>
+          <div class="subtitle">Bill No: ${transaction.invoice_number}</div>
+          <div class="subtitle">Date: ${new Date(transaction.created_at).toLocaleDateString()}</div>
+          <div class="subtitle">Time: ${new Date(transaction.created_at).toLocaleTimeString()}</div>
+          ${transaction.customer ? `<div class="subtitle">Customer: ${transaction.customer.name}</div>` : ''}
         </div>
         
         <div class="line"></div>
         
-        <div class="row bold">
-          <span>Item</span>
-          <span>Qty</span>
-          <span>Rate</span>
-          <span>Amount</span>
-        </div>
-        
-        <div class="line"></div>
-        
-        ${transaction.items
-          .map(
-            (item: any) => `
-          <div class="item-row">
-            <div class="item-name">${item.product.name}</div>
-            <div style="width: 25px; text-align: center;">${item.quantity}</div>
-            <div style="width: 45px; text-align: right;">₹${item.product.price.toFixed(2)}</div>
-            <div style="width: 50px; text-align: right;">₹${item.total.toFixed(2)}</div>
+        ${transaction.items.map((item: any) => `
+          <div class="item">
+            <div class="row">
+              <span class="item-name">${item.product.name}</span>
+              <span>${item.quantity} × ₹${item.product.price}</span>
+            </div>
+            <div class="item-details">
+              ${item.product.brand} • HSN: ${item.product.hsn_code} • ${item.product.gst_rate}% GST
+            </div>
+            <div class="row">
+              <span>Subtotal:</span>
+              <span>₹${(item.product.price * item.quantity).toFixed(2)}</span>
+            </div>
           </div>
-        `,
-          )
-          .join("")}
+        `).join('')}
         
         <div class="line"></div>
         
@@ -162,12 +113,8 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <span>₹${transaction.subtotal.toFixed(2)}</span>
         </div>
         <div class="row">
-          <span>CGST (${((transaction.gst_amount / transaction.subtotal) * 50).toFixed(1)}%):</span>
-          <span>₹${(transaction.gst_amount / 2).toFixed(2)}</span>
-        </div>
-        <div class="row">
-          <span>SGST (${((transaction.gst_amount / transaction.subtotal) * 50).toFixed(1)}%):</span>
-          <span>₹${(transaction.gst_amount / 2).toFixed(2)}</span>
+          <span>GST Amount:</span>
+          <span>₹${transaction.gst_amount.toFixed(2)}</span>
         </div>
         ${transaction.loyalty_discount_amount > 0 ? `
         <div class="row">
@@ -181,37 +128,28 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <span>₹${transaction.rounding_adjustment.toFixed(2)}</span>
         </div>
         ` : ''}
-        <div class="double-line"></div>
-        <div class="row bold">
+        <div class="row total">
           <span>TOTAL:</span>
           <span>₹${transaction.total_amount.toFixed(2)}</span>
         </div>
         
-        ${
-          transaction.payment_method === "cash"
-            ? `
-          <div class="line"></div>
-          <div class="row">
-            <span>Cash:</span>
-            <span>₹${transaction.cash_received.toFixed(2)}</span>
-          </div>
-          <div class="row">
-            <span>Change:</span>
-            <span>₹${transaction.change_amount.toFixed(2)}</span>
-          </div>
-        `
-            : `
-          <div class="line"></div>
-          <div class="row">
-            <span>Payment:</span>
-            <span>${transaction.payment_method.toUpperCase()}</span>
-          </div>
-        `
-        }
+        <div class="row">
+          <span>Payment Method:</span>
+          <span>${transaction.payment_method.toUpperCase()}</span>
+        </div>
+        ${transaction.cash_received ? `
+        <div class="row">
+          <span>Cash Received:</span>
+          <span>₹${transaction.cash_received.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span>Change:</span>
+          <span>₹${transaction.change_amount?.toFixed(2) || '0.00'}</span>
+        </div>
+        ` : ''}
         
-        ${
-          transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
-            ? `
+        ${transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
+          ? `
         <div class="line"></div>
         <div class="loyalty-box">
           <div class="bold">LOYALTY POINTS</div>
@@ -220,192 +158,83 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <div>Thank you for your loyalty!</div>
         </div>
         `
-            : ""
+          : ""
         }
         
         <div class="line"></div>
         
-        <div class="center">
-          ${storeSettings.receipt_footer || "Thank You! Visit Again!"}<br>
-          <div style="margin-top: 5px; font-size: 9px;">
-            Powered by National Mini Mart POS
-          </div>
+        <div class="footer">
+          <div>Thank you for shopping with us!</div>
+          <div>Visit again</div>
         </div>
-        
-        <div style="height: 20px;"></div>
       </body>
       </html>
     `
   }
 
   const generatePDFReceiptHTML = () => {
-    const formatDate = (dateString: string) => {
-      const date = new Date(dateString)
-      return (
-        date.toLocaleDateString("en-IN") +
-        " " +
-        date.toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      )
-    }
-
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Invoice - ${transaction.invoice_number}</title>
+        <meta charset="utf-8">
+        <title>Receipt</title>
         <style>
-          @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
-          }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            max-width: 210mm;
-            margin: 0 auto;
-            padding: 20mm;
-            color: #000;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-          }
-          .company-name {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          .invoice-details {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-          }
-          .customer-details {
-            margin-bottom: 20px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-          }
-          th, td {
-            border: 1px solid #000;
-            padding: 8px;
-            text-align: left;
-          }
-          th {
-            background-color: #f0f0f0;
-            font-weight: bold;
-          }
-          .text-right {
-            text-align: right;
-          }
-          .text-center {
-            text-align: center;
-          }
-          .totals {
-            margin-left: auto;
-            width: 300px;
-          }
-          .total-row {
-            font-weight: bold;
-            background-color: #f0f0f0;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #000;
-          }
-          .loyalty-section {
-            background-color: #f9f9f9;
-            border: 2px solid #6366f1;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-          }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; max-width: 400px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          .title { font-size: 24px; font-weight: bold; margin-bottom: 5px; color: #333; }
+          .subtitle { font-size: 14px; color: #666; margin: 2px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background-color: #f8f9fa; font-weight: bold; }
+          .item-details { font-size: 12px; color: #666; margin-top: 2px; }
+          .total-row { font-weight: bold; font-size: 16px; background-color: #f8f9fa; }
+          .loyalty-section { background-color: #f0f8ff; padding: 10px; margin: 15px 0; border-radius: 5px; }
+          .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; color: #666; }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="company-name">${storeSettings.store_name || "NATIONAL MINI MART"}</div>
-          <div>${storeSettings.store_address || ""}</div>
-          <div>Phone: ${storeSettings.store_phone || ""} | GST: ${storeSettings.gst_number || ""}</div>
+          <div class="title">NATIONAL MINI MART</div>
+          <div class="subtitle">Your Trusted Store</div>
+          <div class="subtitle">Bill No: ${transaction.invoice_number}</div>
+          <div class="subtitle">Date: ${new Date(transaction.created_at).toLocaleDateString()}</div>
+          <div class="subtitle">Time: ${new Date(transaction.created_at).toLocaleTimeString()}</div>
+          ${transaction.customer ? `<div class="subtitle">Customer: ${transaction.customer.name}</div>` : ''}
         </div>
-        
-        <div class="invoice-details">
-          <div>
-            <strong>Invoice No:</strong> ${transaction.invoice_number}<br>
-            <strong>Date:</strong> ${formatDate(transaction.created_at)}<br>
-            <strong>Cashier:</strong> ${transaction.cashier?.full_name || "Staff"}
-          </div>
-          <div>
-            <strong>Payment Method:</strong> ${transaction.payment_method.toUpperCase()}<br>
-            ${transaction.payment_method === "cash" ? `<strong>Cash Received:</strong> ₹${transaction.cash_received.toFixed(2)}<br>` : ""}
-            ${transaction.payment_method === "cash" ? `<strong>Change:</strong> ₹${transaction.change_amount.toFixed(2)}` : ""}
-          </div>
-        </div>
-        
-        ${
-          transaction.customer
-            ? `
-        <div class="customer-details">
-          <strong>Customer Details:</strong><br>
-          Name: ${transaction.customer.name}<br>
-          Phone: ${transaction.customer.phone}<br>
-          ${transaction.customer.email ? `Email: ${transaction.customer.email}<br>` : ""}
-        </div>
-        `
-            : ""
-        }
         
         <table>
           <thead>
             <tr>
-              <th>S.No</th>
-              <th>Item Description</th>
-              <th class="text-center">Qty</th>
-              <th class="text-right">Rate</th>
-              <th class="text-right">GST%</th>
-              <th class="text-right">Amount</th>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th class="text-right">Total</th>
             </tr>
           </thead>
           <tbody>
-            ${transaction.items
-              .map(
-                (item: any, index: number) => `
+            ${transaction.items.map((item: any) => `
               <tr>
-                <td class="text-center">${index + 1}</td>
-                <td>${item.product.name}</td>
-                <td class="text-center">${item.quantity}</td>
-                <td class="text-right">₹${item.product.price.toFixed(2)}</td>
-                <td class="text-right">${item.product.gst_rate}%</td>
-                <td class="text-right">₹${item.total.toFixed(2)}</td>
+                <td>
+                  <div>${item.product.name}</div>
+                  <div class="item-details">${item.product.brand} • HSN: ${item.product.hsn_code}</div>
+                </td>
+                <td>${item.quantity}</td>
+                <td>₹${item.product.price}</td>
+                <td class="text-right">₹${(item.product.price * item.quantity).toFixed(2)}</td>
               </tr>
-            `,
-              )
-              .join("")}
+            `).join('')}
           </tbody>
         </table>
         
-        <table class="totals">
+        <table>
           <tr>
-            <td><strong>Subtotal:</strong></td>
+            <td>Subtotal:</td>
             <td class="text-right">₹${transaction.subtotal.toFixed(2)}</td>
           </tr>
           <tr>
-            <td>CGST:</td>
-            <td class="text-right">₹${(transaction.gst_amount / 2).toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td>SGST:</td>
-            <td class="text-right">₹${(transaction.gst_amount / 2).toFixed(2)}</td>
+            <td>GST Amount:</td>
+            <td class="text-right">₹${transaction.gst_amount.toFixed(2)}</td>
           </tr>
           ${transaction.loyalty_discount_amount > 0 ? `
           <tr>
@@ -420,14 +249,21 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           </tr>
           ` : ''}
           <tr class="total-row">
-            <td><strong>TOTAL:</strong></td>
-            <td class="text-right"><strong>₹${transaction.total_amount.toFixed(2)}</strong></td>
+            <td>TOTAL:</td>
+            <td class="text-right">₹${transaction.total_amount.toFixed(2)}</td>
           </tr>
         </table>
         
-        ${
-          transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
-            ? `
+        <div style="margin: 15px 0;">
+          <strong>Payment Method:</strong> ${transaction.payment_method.toUpperCase()}
+          ${transaction.cash_received ? `
+          <br><strong>Cash Received:</strong> ₹${transaction.cash_received.toFixed(2)}
+          <br><strong>Change:</strong> ₹${transaction.change_amount?.toFixed(2) || '0.00'}
+          ` : ''}
+        </div>
+        
+        ${transaction.customer && (transaction.loyalty_points_earned > 0 || transaction.loyalty_points_redeemed > 0)
+          ? `
         <div class="loyalty-section">
           <h3 style="margin: 0 0 10px 0; color: #6366f1;">🎁 LOYALTY REWARDS</h3>
           ${transaction.loyalty_points_earned > 0 ? `<p style="margin: 5px 0; font-size: 16px;"><strong>Points Earned: +${transaction.loyalty_points_earned}</strong></p>` : ''}
@@ -435,14 +271,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <p style="margin: 5px 0;">Thank you for being a valued customer!</p>
         </div>
         `
-            : ""
+          : ""
         }
         
         <div class="footer">
-          <p><strong>${storeSettings.receipt_footer || "Thank You! Visit Again!"}</strong></p>
-          <p style="font-size: 10px; margin-top: 10px;">
-            This is a computer generated invoice and does not require signature.
-          </p>
+          <div style="font-size: 16px; margin-bottom: 5px;">Thank you for shopping with us!</div>
+          <div>Visit again</div>
         </div>
       </body>
       </html>
