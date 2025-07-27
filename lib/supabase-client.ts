@@ -50,6 +50,7 @@ export type Database = {
           min_stock_level: number
           category_id: string | null
           gst_rate: number
+          price_includes_gst: boolean
           created_at: string
           updated_at: string
         }
@@ -61,6 +62,7 @@ export type Database = {
           min_stock_level?: number
           category_id?: string
           gst_rate?: number
+          price_includes_gst?: boolean
         }
         Update: {
           name?: string
@@ -70,6 +72,7 @@ export type Database = {
           min_stock_level?: number
           category_id?: string
           gst_rate?: number
+          price_includes_gst?: boolean
         }
       }
       transactions: {
@@ -83,11 +86,75 @@ export type Database = {
           subtotal: number
           gst_amount: number
           total_amount: number
+          rounding_adjustment: number
           payment_method: "cash" | "card" | "upi"
           cash_received: number | null
           change_amount: number | null
           status: "completed" | "cancelled" | "pending"
           created_at: string
+        }
+        Insert: {
+          invoice_number: string
+          cashier_id?: string
+          customer_id?: string
+          customer_name?: string
+          customer_phone?: string
+          subtotal: number
+          gst_amount: number
+          total_amount: number
+          rounding_adjustment?: number
+          payment_method: "cash" | "card" | "upi"
+          cash_received?: number
+          change_amount?: number
+          status?: "completed" | "cancelled" | "pending"
+        }
+        Update: {
+          invoice_number?: string
+          cashier_id?: string
+          customer_id?: string
+          customer_name?: string
+          customer_phone?: string
+          subtotal?: number
+          gst_amount?: number
+          total_amount?: number
+          rounding_adjustment?: number
+          payment_method?: "cash" | "card" | "upi"
+          cash_received?: number
+          change_amount?: number
+          status?: "completed" | "cancelled" | "pending"
+        }
+      }
+      transaction_items: {
+        Row: {
+          id: string
+          transaction_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          gst_rate: number
+          price_includes_gst: boolean
+        }
+        Insert: {
+          transaction_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          gst_rate: number
+          price_includes_gst?: boolean
+        }
+        Update: {
+          transaction_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          unit_price?: number
+          total_price?: number
+          gst_rate?: number
+          price_includes_gst?: boolean
         }
       }
       customers: {
