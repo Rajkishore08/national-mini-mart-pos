@@ -169,6 +169,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
           <span>SGST (${((transaction.gst_amount / transaction.subtotal) * 50).toFixed(1)}%):</span>
           <span>₹${(transaction.gst_amount / 2).toFixed(2)}</span>
         </div>
+        ${transaction.rounding_adjustment !== 0 ? `
+        <div class="row">
+          <span>Rounding:</span>
+          <span>₹${transaction.rounding_adjustment.toFixed(2)}</span>
+        </div>
+        ` : ''}
         <div class="double-line"></div>
         <div class="row bold">
           <span>TOTAL:</span>
@@ -394,6 +400,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
             <td>SGST:</td>
             <td class="text-right">₹${(transaction.gst_amount / 2).toFixed(2)}</td>
           </tr>
+          ${transaction.rounding_adjustment !== 0 ? `
+          <tr>
+            <td>Rounding:</td>
+            <td class="text-right">₹${transaction.rounding_adjustment.toFixed(2)}</td>
+          </tr>
+          ` : ''}
           <tr class="total-row">
             <td><strong>TOTAL:</strong></td>
             <td class="text-right"><strong>₹${transaction.total_amount.toFixed(2)}</strong></td>
@@ -501,6 +513,12 @@ export function ReceiptPreview({ transaction, onClose }: ReceiptProps) {
               <span>SGST (9%):</span>
               <span>₹{(transaction.gst_amount / 2).toFixed(2)}</span>
             </div>
+            {transaction.rounding_adjustment !== 0 && (
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Rounding:</span>
+                <span>₹{transaction.rounding_adjustment.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold">
               <span>Total:</span>
               <span>₹{transaction.total_amount.toFixed(2)}</span>

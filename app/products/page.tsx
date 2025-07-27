@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase-client"
 import { Plus, Search, Trash2, Package } from "lucide-react"
 import { toast } from "sonner"
@@ -19,6 +20,8 @@ type Product = {
   price: number
   stock_quantity: number
   min_stock_level: number
+  gst_rate: number
+  price_includes_gst: boolean
 }
 
 export default function ProductsPage() {
@@ -32,6 +35,8 @@ export default function ProductsPage() {
     price: "",
     stock_quantity: "",
     min_stock_level: "5",
+    gst_rate: "18",
+    price_includes_gst: "false",
   })
 
   useEffect(() => {
@@ -42,7 +47,7 @@ export default function ProductsPage() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, stock_quantity, min_stock_level")
+        .select("id, name, price, stock_quantity, min_stock_level, gst_rate, price_includes_gst")
         .order("name")
 
       if (error) {
@@ -65,6 +70,8 @@ export default function ProductsPage() {
       price: "",
       stock_quantity: "",
       min_stock_level: "5",
+      gst_rate: "18",
+      price_includes_gst: "false",
     })
   }
 
@@ -76,7 +83,8 @@ export default function ProductsPage() {
       price: Number.parseFloat(formData.price),
       stock_quantity: Number.parseInt(formData.stock_quantity),
       min_stock_level: Number.parseInt(formData.min_stock_level),
-      gst_rate: 18.0, // Default GST rate
+      gst_rate: Number.parseFloat(formData.gst_rate),
+      price_includes_gst: formData.price_includes_gst === "true",
     }
 
     try {
@@ -87,10 +95,10 @@ export default function ProductsPage() {
       fetchProducts()
       setShowAddDialog(false)
       resetForm()
-              toast.success("Product added successfully!")
+      toast.success("Product added successfully!")
     } catch (error) {
       console.error("Error saving product:", error)
-              toast.error("Error saving product")
+      toast.error("Error saving product")
     }
   }
 
@@ -103,10 +111,10 @@ export default function ProductsPage() {
       if (error) throw error
 
       fetchProducts()
-              toast.success("Product deleted successfully!")
+      toast.success("Product deleted successfully!")
     } catch (error) {
       console.error("Error deleting product:", error)
-              toast.error("Error deleting product")
+      toast.error("Error deleting product")
     }
   }
 
@@ -187,15 +195,40 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="min_stock_level">Min Stock Level</Label>
-                <Input
-                  id="min_stock_level"
-                  type="number"
-                  value={formData.min_stock_level}
-                  onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                  required
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="min_stock_level">Min Stock Level</Label>
+                  <Input
+                    id="min_stock_level"
+                    type="number"
+                    value={formData.min_stock_level}
+                    onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gst_rate">GST Rate (%)</Label>
+                  <Input
+                    id="gst_rate"
+                    type="number"
+                    step="0.01"
+                    value={formData.gst_rate}
+                    onChange={(e) => setFormData({ ...formData, gst_rate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="price_includes_gst"
+                  checked={formData.price_includes_gst === "true"}
+                  onChange={(e) => setFormData({ ...formData, price_includes_gst: e.target.checked ? "true" : "false" })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
+                <Label htmlFor="price_includes_gst" className="text-sm text-muted-foreground">
+                  Price includes GST
+                </Label>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
@@ -242,6 +275,8 @@ export default function ProductsPage() {
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">Min Level: {product.min_stock_level}</p>
+                <p className="text-sm text-muted-foreground">GST Rate: {product.gst_rate}%</p>
+                <p className="text-sm text-muted-foreground">Price Includes GST: {product.price_includes_gst ? "Yes" : "No"}</p>
                 {product.stock_quantity <= product.min_stock_level && (
                   <div className="flex items-center text-red-600 text-sm">
                     <Package className="h-4 w-4 mr-1" />

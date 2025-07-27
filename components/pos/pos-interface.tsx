@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,7 @@ type Product = {
   price: number
   stock_quantity: number
   gst_rate: number
+  price_includes_gst: boolean
   barcode?: string
 }
 
@@ -51,9 +52,11 @@ export function POSInterface() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showReceipt, setShowReceipt] = useState(false)
   const [lastTransaction, setLastTransaction] = useState<any>(null)
+  const lastBillNumberRef = useRef<string>("NM 0000")
 
   useEffect(() => {
     fetchProducts()
+    fetchLastBillNumber()
   }, [])
 
   const fetchProducts = async () => {
@@ -72,6 +75,36 @@ export function POSInterface() {
     } finally {
       setProductsLoading(false)
     }
+  }
+
+  const fetchLastBillNumber = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("invoice_number")
+        .like("invoice_number", "NM %")
+        .order("invoice_number", { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error("Error fetching last bill number:", error)
+        return
+      }
+
+      if (data && data.length > 0) {
+        lastBillNumberRef.current = data[0].invoice_number
+      }
+    } catch (error) {
+      console.error("Error:", error)
+    }
+  }
+
+  const getNextBillNumber = () => {
+    const currentNumber = parseInt(lastBillNumberRef.current.replace("NM ", ""))
+    const nextNumber = currentNumber + 1
+    const formattedNumber = `NM ${nextNumber.toString().padStart(4, "0")}`
+    lastBillNumberRef.current = formattedNumber
+    return formattedNumber
   }
 
   const filteredProducts = products.filter(
@@ -121,24 +154,39 @@ export function POSInterface() {
 
   const calculateTotals = () => {
     const subtotal = cart.reduce((sum, item) => sum + item.total, 0)
+    
+    // Calculate GST based on whether price includes GST or not
     const gstAmount = cart.reduce((sum, item) => {
-      const itemGst = (item.total * item.product.gst_rate) / 100
+      let itemGst = 0
+      if (item.product.price_includes_gst) {
+        // If price includes GST, extract GST amount
+        const priceWithoutGst = item.total / (1 + item.product.gst_rate / 100)
+        itemGst = item.total - priceWithoutGst
+      } else {
+        // If price excludes GST, add GST amount
+        itemGst = (item.total * item.product.gst_rate) / 100
+      }
       return sum + itemGst
     }, 0)
+    
     const total = subtotal + gstAmount
+    
+    // Round the total to nearest rupee (no paise)
+    const roundedTotal = Math.round(total)
+    const roundingAdjustment = roundedTotal - total
 
-    return { subtotal, gstAmount, total }
+    return { subtotal, gstAmount, total, roundedTotal, roundingAdjustment }
   }
 
-  const { subtotal, gstAmount, total } = calculateTotals()
-  const changeAmount = paymentMethod === "cash" ? Math.max(0, Number.parseFloat(cashReceived || "0") - total) : 0
-  const loyaltyPointsEarned = Math.floor(total / 100)
+  const { subtotal, gstAmount, total, roundedTotal, roundingAdjustment } = calculateTotals()
+  const changeAmount = paymentMethod === "cash" ? Math.max(0, Number.parseFloat(cashReceived || "0") - roundedTotal) : 0
+  const loyaltyPointsEarned = Math.floor(roundedTotal / 100)
 
   const processPayment = async () => {
     if (cart.length === 0) return
 
-    if (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < total) {
-              toast.error("Insufficient cash received")
+    if (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < roundedTotal) {
+      toast.error("Insufficient cash received")
       return
     }
 
@@ -146,7 +194,7 @@ export function POSInterface() {
 
     try {
       // Generate invoice number
-      const invoiceNumber = `NMM-${Date.now().toString().slice(-6)}`
+      const invoiceNumber = getNextBillNumber()
 
       // Create transaction
       const transactionData = {
@@ -157,7 +205,8 @@ export function POSInterface() {
         customer_phone: selectedCustomer?.phone || null,
         subtotal,
         gst_amount: gstAmount,
-        total_amount: total,
+        total_amount: roundedTotal,
+        rounding_adjustment: roundingAdjustment,
         payment_method: paymentMethod,
         cash_received: paymentMethod === "cash" ? Number.parseFloat(cashReceived) : null,
         change_amount: paymentMethod === "cash" ? changeAmount : null,
@@ -181,6 +230,7 @@ export function POSInterface() {
         unit_price: item.product.price,
         total_price: item.total,
         gst_rate: item.product.gst_rate,
+        price_includes_gst: item.product.price_includes_gst,
       }))
 
       const { error: itemsError } = await supabase.from("transaction_items").insert(transactionItems)
@@ -205,7 +255,7 @@ export function POSInterface() {
           .from("customers")
           .update({
             loyalty_points: selectedCustomer.loyalty_points + loyaltyPointsEarned,
-            total_spent: selectedCustomer.total_spent + total,
+            total_spent: selectedCustomer.total_spent + roundedTotal,
           })
           .eq("id", selectedCustomer.id)
       }
@@ -232,7 +282,7 @@ export function POSInterface() {
       fetchProducts()
     } catch (error) {
       console.error("Error processing payment:", error)
-              toast.error("Error processing payment. Please try again.")
+      toast.error("Error processing payment. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -379,9 +429,15 @@ export function POSInterface() {
                 <span>GST:</span>
                 <span>{formatCurrency(gstAmount)}</span>
               </div>
+              {roundingAdjustment !== 0 && (
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Rounding:</span>
+                  <span>{formatCurrency(roundingAdjustment)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-lg font-bold">
                 <span>Total:</span>
-                <span>{formatCurrency(total)}</span>
+                <span>{formatCurrency(roundedTotal)}</span>
               </div>
               {selectedCustomer && loyaltyPointsEarned > 0 && (
                 <div className="flex justify-between text-sm text-purple-600">
@@ -432,7 +488,7 @@ export function POSInterface() {
                     onChange={(e) => setCashReceived(e.target.value)}
                     className="text-lg font-medium"
                   />
-                  {cashReceived && Number.parseFloat(cashReceived) >= total && (
+                  {cashReceived && Number.parseFloat(cashReceived) >= roundedTotal && (
                     <div className="text-sm bg-green-50 dark:bg-green-950/20 p-2 rounded">
                       <span className="font-medium">Change: </span>
                       <span className="text-green-600 font-bold text-lg">{formatCurrency(changeAmount)}</span>
@@ -448,7 +504,7 @@ export function POSInterface() {
               disabled={
                 cart.length === 0 ||
                 loading ||
-                (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < total)
+                (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < roundedTotal)
               }
             >
               {loading ? (
@@ -456,7 +512,7 @@ export function POSInterface() {
               ) : (
                 <>
                   <Receipt className="h-5 w-5 mr-2" />
-                  Pay {formatCurrency(total)}
+                  Pay {formatCurrency(roundedTotal)}
                 </>
               )}
             </Button>
