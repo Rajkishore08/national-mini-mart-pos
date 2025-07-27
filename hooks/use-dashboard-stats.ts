@@ -72,48 +72,51 @@ export function useDashboardStats() {
   }
 
   useEffect(() => {
-    fetchStats()
+    // Only fetch stats if Supabase is properly configured
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      fetchStats()
 
-    // Set up real-time subscription for transactions
-    const transactionsSubscription = supabase
-      .channel('dashboard-transactions')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'transactions' },
-        () => {
-          // Refetch stats when transactions change
-          fetchStats()
-        }
-      )
-      .subscribe()
+      // Set up real-time subscription for transactions
+      const transactionsSubscription = supabase
+        .channel('dashboard-transactions')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'transactions' },
+          () => {
+            // Refetch stats when transactions change
+            fetchStats()
+          }
+        )
+        .subscribe()
 
-    // Set up real-time subscription for products
-    const productsSubscription = supabase
-      .channel('dashboard-products')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'products' },
-        () => {
-          // Refetch stats when products change
-          fetchStats()
-        }
-      )
-      .subscribe()
+      // Set up real-time subscription for products
+      const productsSubscription = supabase
+        .channel('dashboard-products')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'products' },
+          () => {
+            // Refetch stats when products change
+            fetchStats()
+          }
+        )
+        .subscribe()
 
-    // Set up real-time subscription for customers
-    const customersSubscription = supabase
-      .channel('dashboard-customers')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'customers' },
-        () => {
-          // Refetch stats when customers change
-          fetchStats()
-        }
-      )
-      .subscribe()
+      // Set up real-time subscription for customers
+      const customersSubscription = supabase
+        .channel('dashboard-customers')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'customers' },
+          () => {
+            // Refetch stats when customers change
+            fetchStats()
+          }
+        )
+        .subscribe()
 
-    return () => {
-      transactionsSubscription.unsubscribe()
-      productsSubscription.unsubscribe()
-      customersSubscription.unsubscribe()
+      return () => {
+        transactionsSubscription.unsubscribe()
+        productsSubscription.unsubscribe()
+        customersSubscription.unsubscribe()
+      }
     }
   }, [])
 

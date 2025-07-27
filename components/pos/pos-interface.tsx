@@ -12,6 +12,7 @@ import { CustomerSelector } from "./customer-selector"
 import { ReceiptPreview } from "./receipt-preview"
 import { Search, Plus, Minus, Trash2, CreditCard, Smartphone, Banknote, Receipt } from "lucide-react"
 import { toast } from "sonner"
+import { useRef } from "react"
 
 type Product = {
   id: string
@@ -19,6 +20,7 @@ type Product = {
   price: number
   stock_quantity: number
   gst_rate: number
+  price_includes_gst?: boolean
   barcode?: string
 }
 
@@ -51,9 +53,36 @@ export function POSInterface() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showReceipt, setShowReceipt] = useState(false)
   const [lastTransaction, setLastTransaction] = useState<any>(null)
+  const lastBillNumberRef = useRef<number | null>(null)
 
   useEffect(() => {
     fetchProducts()
+  }, [])
+
+  useEffect(() => {
+    // Fetch the latest bill number on mount
+    const fetchLastBillNumber = async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("invoice_number")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+      if (!error && data && data.invoice_number) {
+        // Extract the numeric part after 'NM '
+        const match = data.invoice_number.match(/^NM (\d{4})$/)
+        if (match) {
+          lastBillNumberRef.current = parseInt(match[1], 10)
+        } else {
+          // Fallback: try to parse as integer
+          const fallbackMatch = data.invoice_number.match(/(\d{4})$/)
+          lastBillNumberRef.current = fallbackMatch ? parseInt(fallbackMatch[1], 10) : 0
+        }
+      } else {
+        lastBillNumberRef.current = 0
+      }
+    }
+    fetchLastBillNumber()
   }, [])
 
   const fetchProducts = async () => {
@@ -120,24 +149,47 @@ export function POSInterface() {
   }
 
   const calculateTotals = () => {
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0)
-    const gstAmount = cart.reduce((sum, item) => {
-      const itemGst = (item.total * item.product.gst_rate) / 100
-      return sum + itemGst
-    }, 0)
-    const total = subtotal + gstAmount
+    let subtotal = 0
+    let gstAmount = 0
+    let total = 0
 
-    return { subtotal, gstAmount, total }
+    cart.forEach((item) => {
+      const { price, gst_rate, price_includes_gst } = item.product
+      let itemSubtotal = 0
+      let itemGst = 0
+      if (price_includes_gst) {
+        // Price is inclusive of GST
+        itemSubtotal = (price * item.quantity) / (1 + gst_rate / 100)
+        itemGst = (price * item.quantity) - itemSubtotal
+      } else {
+        // Price is exclusive of GST
+        itemSubtotal = price * item.quantity
+        itemGst = itemSubtotal * (gst_rate / 100)
+      }
+      subtotal += itemSubtotal
+      gstAmount += itemGst
+    })
+    total = subtotal + gstAmount
+    // Round to nearest rupee
+    const roundedTotal = Math.round(total)
+    const roundingAdjustment = roundedTotal - total
+    return { subtotal, gstAmount, total, roundedTotal, roundingAdjustment }
   }
 
-  const { subtotal, gstAmount, total } = calculateTotals()
-  const changeAmount = paymentMethod === "cash" ? Math.max(0, Number.parseFloat(cashReceived || "0") - total) : 0
-  const loyaltyPointsEarned = Math.floor(total / 100)
+  const { subtotal, gstAmount, total, roundedTotal, roundingAdjustment } = calculateTotals()
+  const changeAmount = paymentMethod === "cash" ? Math.max(0, Number.parseFloat(cashReceived || "0") - roundedTotal) : 0
+  const loyaltyPointsEarned = Math.floor(roundedTotal / 100)
+
+  const getNextBillNumber = () => {
+    if (lastBillNumberRef.current == null) return "NM 0001";
+    const next = lastBillNumberRef.current + 1;
+    return `NM ${next.toString().padStart(4, "0")}`;
+  }
 
   const processPayment = async () => {
     if (cart.length === 0) return
 
-    if (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < total) {
+    if (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < roundedTotal) {
               toast.error("Insufficient cash received")
       return
     }
@@ -145,8 +197,8 @@ export function POSInterface() {
     setLoading(true)
 
     try {
-      // Generate invoice number
-      const invoiceNumber = `NMM-${Date.now().toString().slice(-6)}`
+      // Generate progressive bill number
+      const invoiceNumber = getNextBillNumber()
 
       // Create transaction
       const transactionData = {
@@ -157,7 +209,8 @@ export function POSInterface() {
         customer_phone: selectedCustomer?.phone || null,
         subtotal,
         gst_amount: gstAmount,
-        total_amount: total,
+        total_amount: roundedTotal,
+        rounding_adjustment: roundingAdjustment,
         payment_method: paymentMethod,
         cash_received: paymentMethod === "cash" ? Number.parseFloat(cashReceived) : null,
         change_amount: paymentMethod === "cash" ? changeAmount : null,
@@ -172,6 +225,9 @@ export function POSInterface() {
 
       if (transactionError) throw transactionError
 
+      // Update the last bill number ref
+      lastBillNumberRef.current = parseInt(invoiceNumber.replace("NM ", ""), 10)
+
       // Create transaction items
       const transactionItems = cart.map((item) => ({
         transaction_id: transaction.id,
@@ -181,6 +237,7 @@ export function POSInterface() {
         unit_price: item.product.price,
         total_price: item.total,
         gst_rate: item.product.gst_rate,
+        price_includes_gst: item.product.price_includes_gst,
       }))
 
       const { error: itemsError } = await supabase.from("transaction_items").insert(transactionItems)
@@ -205,7 +262,7 @@ export function POSInterface() {
           .from("customers")
           .update({
             loyalty_points: selectedCustomer.loyalty_points + loyaltyPointsEarned,
-            total_spent: selectedCustomer.total_spent + total,
+            total_spent: selectedCustomer.total_spent + roundedTotal,
           })
           .eq("id", selectedCustomer.id)
       }
@@ -217,6 +274,7 @@ export function POSInterface() {
         customer: selectedCustomer,
         cashier: profile,
         loyalty_points_earned: selectedCustomer ? loyaltyPointsEarned : 0,
+        rounding_adjustment: roundingAdjustment,
       }
 
       // Clear cart and show success
@@ -432,7 +490,7 @@ export function POSInterface() {
                     onChange={(e) => setCashReceived(e.target.value)}
                     className="text-lg font-medium"
                   />
-                  {cashReceived && Number.parseFloat(cashReceived) >= total && (
+                  {cashReceived && Number.parseFloat(cashReceived) >= roundedTotal && (
                     <div className="text-sm bg-green-50 dark:bg-green-950/20 p-2 rounded">
                       <span className="font-medium">Change: </span>
                       <span className="text-green-600 font-bold text-lg">{formatCurrency(changeAmount)}</span>
@@ -448,7 +506,7 @@ export function POSInterface() {
               disabled={
                 cart.length === 0 ||
                 loading ||
-                (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < total)
+                (paymentMethod === "cash" && Number.parseFloat(cashReceived || "0") < roundedTotal)
               }
             >
               {loading ? (
@@ -456,7 +514,7 @@ export function POSInterface() {
               ) : (
                 <>
                   <Receipt className="h-5 w-5 mr-2" />
-                  Pay {formatCurrency(total)}
+                  Pay {formatCurrency(roundedTotal)}
                 </>
               )}
             </Button>

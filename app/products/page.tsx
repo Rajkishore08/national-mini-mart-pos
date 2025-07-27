@@ -19,6 +19,8 @@ type Product = {
   price: number
   stock_quantity: number
   min_stock_level: number
+  gst_rate: number
+  price_includes_gst: boolean
 }
 
 export default function ProductsPage() {
@@ -32,6 +34,8 @@ export default function ProductsPage() {
     price: "",
     stock_quantity: "",
     min_stock_level: "5",
+    gst_rate: "18",
+    price_includes_gst: true,
   })
 
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function ProductsPage() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, stock_quantity, min_stock_level")
+        .select("id, name, price, stock_quantity, min_stock_level, gst_rate, price_includes_gst")
         .order("name")
 
       if (error) {
@@ -65,6 +69,8 @@ export default function ProductsPage() {
       price: "",
       stock_quantity: "",
       min_stock_level: "5",
+      gst_rate: "18",
+      price_includes_gst: true,
     })
   }
 
@@ -76,7 +82,8 @@ export default function ProductsPage() {
       price: Number.parseFloat(formData.price),
       stock_quantity: Number.parseInt(formData.stock_quantity),
       min_stock_level: Number.parseInt(formData.min_stock_level),
-      gst_rate: 18.0, // Default GST rate
+      gst_rate: Number.parseFloat(formData.gst_rate),
+      price_includes_gst: formData.price_includes_gst,
     }
 
     try {
@@ -87,10 +94,10 @@ export default function ProductsPage() {
       fetchProducts()
       setShowAddDialog(false)
       resetForm()
-              toast.success("Product added successfully!")
+      toast.success("Product added successfully!")
     } catch (error) {
       console.error("Error saving product:", error)
-              toast.error("Error saving product")
+      toast.error("Error saving product")
     }
   }
 
@@ -103,10 +110,10 @@ export default function ProductsPage() {
       if (error) throw error
 
       fetchProducts()
-              toast.success("Product deleted successfully!")
+      toast.success("Product deleted successfully!")
     } catch (error) {
       console.error("Error deleting product:", error)
-              toast.error("Error deleting product")
+      toast.error("Error deleting product")
     }
   }
 
@@ -187,6 +194,29 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gst_rate">GST Rate (%)</Label>
+                  <Input
+                    id="gst_rate"
+                    type="number"
+                    step="0.01"
+                    value={formData.gst_rate}
+                    onChange={(e) => setFormData({ ...formData, gst_rate: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2 flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.price_includes_gst}
+                      onChange={(e) => setFormData({ ...formData, price_includes_gst: e.target.checked })}
+                    />
+                    <span className="text-sm">Price includes GST</span>
+                  </label>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="min_stock_level">Min Stock Level</Label>
                 <Input
@@ -240,6 +270,10 @@ export default function ProductsPage() {
                   <Badge variant={product.stock_quantity <= product.min_stock_level ? "destructive" : "secondary"}>
                     Stock: {product.stock_quantity}
                   </Badge>
+                </div>
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>GST: {product.gst_rate}%</span>
+                  <span>{product.price_includes_gst ? "Inclusive" : "Exclusive"}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Min Level: {product.min_stock_level}</p>
                 {product.stock_quantity <= product.min_stock_level && (

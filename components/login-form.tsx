@@ -71,12 +71,6 @@ export function LoginForm() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-6 text-sm text-gray-600 dark:text-gray-400">
-            <p className="font-semibold">Demo Accounts:</p>
-            <p>Admin: admin@nationalmart.com / admin123</p>
-            <p>Cashier: cashier@nationalmart.com / cashier123</p>
-            <p>Manager: manager@nationalmart.com / manager123</p>
-          </div>
         </CardContent>
       </Card>
     </div>
